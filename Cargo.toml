@@ -1,0 +1,17 @@
+[package]
+name = "http-proxy-impl"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+
+[workspace.dependencies]
+tracing = "0.1"
+
+[workspace.lints.clippy]
+pedantic = "deny"
+nursery = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+enum_glob_use = "deny"
