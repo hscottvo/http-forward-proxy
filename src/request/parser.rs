@@ -1,7 +1,7 @@
 use crate::request::startline::StartLine;
 
 use super::Request;
-use eyre::{OptionExt as _, Result};
+use eyre::{OptionExt as _, Result, ensure};
 use std::collections::VecDeque;
 use tracing::{debug, instrument};
 
@@ -31,7 +31,7 @@ impl RequestParser {
         for &byte in buf {
             self.buf.push_back(byte);
         }
-        if let Some(section) = self.capture_until_crlf() {
+        while let Some(section) = self.capture_until_crlf() {
             debug!("{section:?}");
             self.parse_section(section)?;
         }
@@ -41,7 +41,7 @@ impl RequestParser {
     fn parse_section(&mut self, line: String) -> Result<()> {
         match self.phase {
             ParsePhase::StartLine => self.parse_startline(line)?,
-            ParsePhase::Headers => todo!(),
+            ParsePhase::Headers => self.parse_header(line)?,
             ParsePhase::Finished => todo!(),
         };
         Ok(())
@@ -64,8 +64,10 @@ impl RequestParser {
 
         let version = parts
             .next()
-            .ok_or_eyre("invalide startline: missing version")?
+            .ok_or_eyre("invalid startline: missing version")?
             .parse()?;
+
+        ensure!(parts.next().is_none(), "invalid startline: extra parts");
 
         self.phase = ParsePhase::Headers;
         self.startline = Some(StartLine::new(method, target, version));
@@ -74,6 +76,13 @@ impl RequestParser {
 
         Ok(())
     }
+
+    #[instrument(skip(self))]
+    fn parse_header(&mut self, line: String) -> Result<()> {
+        let line = line.trim_matches(['\r', '\n']).to_owned();
+        Ok(())
+    }
+
     fn capture_until_crlf(&mut self) -> Option<String> {
         if let Some(cr_index) = self.buf.iter().position(|&x| x == b'\r')
             && let lf_index = cr_index + 1
@@ -92,8 +101,6 @@ impl RequestParser {
 
 #[cfg(test)]
 mod tests {
-
-    use std::io::Read;
 
     use super::*;
 

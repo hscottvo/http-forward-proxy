@@ -2,15 +2,6 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-use super::method::Method;
-
-#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub enum RequestSection {
-    StartLine(StartLine),
-    Headers,
-    Finished,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum HttpVersion {
     Http1_1,

@@ -13,6 +13,7 @@ pub enum Method {
     Delete,
 }
 
+#[cfg(test)]
 pub type Result<T> = std::result::Result<T, MethodError>;
 
 #[derive(Error, Debug)]
