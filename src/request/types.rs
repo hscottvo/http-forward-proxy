@@ -34,19 +34,3 @@ impl FromStr for HttpVersion {
         }
     }
 }
-
-#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub struct StartLine {
-    method: Method,
-    target: String,
-    version: HttpVersion,
-}
-impl StartLine {
-    pub fn new(method: Method, target: String, version: HttpVersion) -> Self {
-        Self {
-            method,
-            target,
-            version,
-        }
-    }
-}
