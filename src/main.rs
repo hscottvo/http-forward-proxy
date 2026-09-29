@@ -1,5 +1,6 @@
 mod request;
 mod response;
+mod types;
 use eyre::Result;
 use std::{
     io::{Read, Write as _},

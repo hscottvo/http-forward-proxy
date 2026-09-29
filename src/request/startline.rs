@@ -2,7 +2,8 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-use crate::request::{method::Method, types::HttpVersion};
+use crate::request::method::Method;
+use crate::types::HttpVersion;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct StartLine {
