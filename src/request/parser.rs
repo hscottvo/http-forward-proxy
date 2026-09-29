@@ -1,5 +1,4 @@
-use super::method::Method;
-use super::types::StartLine;
+use crate::request::startline::StartLine;
 
 use super::Request;
 use eyre::{OptionExt as _, Result};
