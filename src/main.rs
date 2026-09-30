@@ -25,7 +25,7 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
             break response;
         }
     };
-    debug!(request=?request);
+    debug!(request = %request);
     stream.write_all(DUMMY_RESPONSE.as_bytes())?;
     stream.shutdown(Shutdown::Both)?;
     Ok(())

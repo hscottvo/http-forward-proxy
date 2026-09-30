@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use thiserror::Error;
 
@@ -23,5 +23,14 @@ impl FromStr for HttpVersion {
             "HTTP/2" => Err(HttpVersionError::VersionNotSupported),
             _ => Err(HttpVersionError::UnknownVersion),
         }
+    }
+}
+
+impl Display for HttpVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match *self {
+            HttpVersion::Http1_1 => "HTTP/1.1",
+        };
+        write!(f, "{string}")
     }
 }
