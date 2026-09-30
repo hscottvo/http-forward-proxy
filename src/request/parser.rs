@@ -1,7 +1,7 @@
 use crate::request::startline::StartLine;
 
 use super::Request;
-use eyre::{Result, bail};
+use eyre::{OptionExt, Result, bail};
 use std::collections::{HashMap, VecDeque};
 use tracing::{debug, instrument, warn};
 
@@ -9,6 +9,7 @@ use tracing::{debug, instrument, warn};
 pub enum ParsePhase {
     StartLine,
     Headers,
+    Body,
     Finished,
 }
 #[derive(Clone, Debug)]
@@ -17,6 +18,7 @@ pub struct RequestParser {
     phase: ParsePhase,
     startline: Option<StartLine>,
     headers: HashMap<String, String>,
+    body: String,
 }
 
 impl RequestParser {
@@ -26,6 +28,7 @@ impl RequestParser {
             phase: ParsePhase::StartLine,
             startline: None,
             headers: HashMap::new(),
+            body: String::new(),
         }
     }
     #[instrument(skip(self, buf), fields(phase = ?self.phase))]
@@ -36,6 +39,13 @@ impl RequestParser {
         while let Some(section) = self.capture_until_crlf() {
             debug!("{section:?}");
             self.parse_section(section)?;
+            if self.phase == ParsePhase::Finished {
+                return Ok(Some(Request::new(
+                    self.startline.clone().ok_or_eyre("missing startline")?,
+                    self.headers.clone(),
+                    self.body.clone(),
+                )));
+            }
         }
 
         Ok(None)
@@ -44,6 +54,7 @@ impl RequestParser {
         match self.phase {
             ParsePhase::StartLine => self.parse_startline(line)?,
             ParsePhase::Headers => self.parse_header(line)?,
+            ParsePhase::Body => self.parse_body(line)?,
             ParsePhase::Finished => todo!(),
         };
         Ok(())
@@ -62,9 +73,12 @@ impl RequestParser {
     fn parse_header(&mut self, line: String) -> Result<()> {
         let line = line.trim_matches(['\r', '\n']).to_owned();
         if line.is_empty() {
-            // This should probably be body or something?
-            self.phase = ParsePhase::Finished;
             debug!("done parsing headers");
+            // This should probably be body or something?
+            if contains_body(&self.headers) {
+                self.phase = ParsePhase::Body;
+            }
+            self.phase = ParsePhase::Finished;
             return Ok(());
         }
         let mut header = line.split(": ");
@@ -82,6 +96,13 @@ impl RequestParser {
         }
     }
 
+    #[instrument(skip(self))]
+    fn parse_body(&mut self, line: String) -> Result<()> {
+        debug!("parsing body");
+
+        Ok(())
+    }
+
     fn capture_until_crlf(&mut self) -> Option<String> {
         if let Some(cr_index) = self.buf.iter().position(|&x| x == b'\r')
             && let lf_index = cr_index + 1
@@ -95,6 +116,10 @@ impl RequestParser {
             None
         }
     }
+}
+
+fn contains_body(headers: &HashMap<String, String>) -> bool {
+    false
 }
 
 #[cfg(test)]

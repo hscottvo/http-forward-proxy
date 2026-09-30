@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::str::FromStr;
 
 use thiserror::Error;
@@ -18,6 +19,12 @@ impl StartLine {
             target,
             version,
         }
+    }
+}
+
+impl Display for StartLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.method, self.target, self.version)
     }
 }
 
