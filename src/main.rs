@@ -22,7 +22,7 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
     debug!(request = %request);
 
     let mut x = TcpStream::connect("www.example.com:80")?;
-    let mut y = [0u8; 1000];
+    let mut y = [0u8; 5000];
     let a = x.write(&request.to_string().into_bytes())?;
     debug!(bytes=?a, "wrote to example.com");
     let z = x.read(&mut y)?;
