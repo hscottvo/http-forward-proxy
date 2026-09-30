@@ -24,8 +24,9 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
     let mut x = TcpStream::connect("www.example.com:80")?;
     let mut y = [0u8; 1000];
     let a = x.write(&request.to_string().into_bytes())?;
-    debug!("wrote {:?} bytes to example.com", a);
+    debug!(bytes=?a, "wrote to example.com");
     let z = x.read(&mut y)?;
+    debug!(response=%String::from_utf8_lossy(&y[..]), response_bytes=?z, "received response");
     stream.write_all(&y[..z])?;
     stream.shutdown(Shutdown::Both)?;
     Ok(())

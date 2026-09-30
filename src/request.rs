@@ -13,7 +13,7 @@ pub struct Request {
     body: String,
 }
 impl Request {
-    pub fn new(startline: StartLine, headers: HashMap<String, String>, body: String) -> Self {
+    pub const fn new(startline: StartLine, headers: HashMap<String, String>, body: String) -> Self {
         Self {
             startline,
             headers,
@@ -26,7 +26,7 @@ impl Display for Request {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.startline)?;
         for (field, value) in &self.headers {
-            writeln!(f, "{}: {}", field, value)?;
+            writeln!(f, "{field}: {value}")?;
         }
         writeln!(f)?;
         writeln!(f, "{}", self.body)?;

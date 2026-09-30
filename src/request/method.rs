@@ -38,10 +38,10 @@ impl FromStr for Method {
 
     fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
         match s {
-            "GET" => Ok(Method::Get),
-            "PUT" => Ok(Method::Put),
-            "POST" => Ok(Method::Post),
-            "DELETE" => Ok(Method::Delete),
+            "GET" => Ok(Self::Get),
+            "PUT" => Ok(Self::Put),
+            "POST" => Ok(Self::Post),
+            "DELETE" => Ok(Self::Delete),
             _ => Err(MethodError::NotSupported(s.to_owned())),
         }
     }

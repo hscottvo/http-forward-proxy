@@ -29,7 +29,7 @@ impl FromStr for HttpVersion {
 impl Display for HttpVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let string = match *self {
-            HttpVersion::Http1_1 => "HTTP/1.1",
+            Self::Http1_1 => "HTTP/1.1",
         };
         write!(f, "{string}")
     }

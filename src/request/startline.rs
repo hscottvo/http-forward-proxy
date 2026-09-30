@@ -13,7 +13,7 @@ pub struct StartLine {
     version: HttpVersion,
 }
 impl StartLine {
-    pub fn new(method: Method, target: String, version: HttpVersion) -> Self {
+    pub const fn new(method: Method, target: String, version: HttpVersion) -> Self {
         Self {
             method,
             target,
@@ -51,10 +51,10 @@ impl FromStr for StartLine {
             .ok_or(StartLineError::MissingHttpVersion)?
             .parse()?;
 
-        if !parts.next().is_none() {
+        if parts.next().is_some() {
             return Err(StartLineError::Malformed);
         }
-        Ok(StartLine::new(method, target, version))
+        Ok(Self::new(method, target, version))
     }
 }
 
