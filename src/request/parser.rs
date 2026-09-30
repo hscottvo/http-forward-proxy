@@ -38,13 +38,13 @@ impl RequestParser {
         }
         while let Some(section) = self.capture_until_crlf() {
             debug!("{section:?}");
-            self.parse_section(section)?;
+            self.parse_section(&section)?;
         }
 
         if self.phase == ParsePhase::Body
             && let Some(section) = self.capture_all()
         {
-            self.parse_section(section)?;
+            self.parse_section(&section)?;
         }
         if self.phase == ParsePhase::Finished {
             return Ok(Some(Request::new(
@@ -56,17 +56,17 @@ impl RequestParser {
         Ok(None)
     }
     #[instrument(skip(self))]
-    fn parse_section(&mut self, line: String) -> Result<()> {
+    fn parse_section(&mut self, line: &str) -> Result<()> {
         match self.phase {
             ParsePhase::StartLine => self.parse_startline(line)?,
             ParsePhase::Headers => self.parse_header(line)?,
             ParsePhase::Body => self.parse_body(line)?,
             ParsePhase::Finished => todo!(),
-        };
+        }
         Ok(())
     }
     #[instrument(skip(self))]
-    fn parse_startline(&mut self, line: String) -> Result<()> {
+    fn parse_startline(&mut self, line: &str) -> Result<()> {
         self.startline = Some(line.parse()?);
         self.phase = ParsePhase::Headers;
 
@@ -76,7 +76,7 @@ impl RequestParser {
     }
 
     #[instrument()]
-    fn parse_header(&mut self, line: String) -> Result<()> {
+    fn parse_header(&mut self, line: &str) -> Result<()> {
         let line = line.trim_matches(['\r', '\n']).to_owned();
         if line.is_empty() {
             if contains_body(&self.headers) {
@@ -102,7 +102,7 @@ impl RequestParser {
     }
 
     #[instrument(skip(self))]
-    fn parse_body(&mut self, body: String) -> Result<()> {
+    fn parse_body(&mut self, body: &str) -> Result<()> {
         let content_length = self
             .headers
             .get("Content-Length")
@@ -112,7 +112,7 @@ impl RequestParser {
             body.len() == content_length,
             "bytes read do not match Content-Length header"
         );
-        self.body = body;
+        body.clone_into(&mut self.body);
         self.phase = ParsePhase::Finished;
 
         Ok(())
@@ -124,7 +124,7 @@ impl RequestParser {
             && let Some(&next) = self.buf.get(lf_index)
             && next == b'\n'
         {
-            let bytes: Vec<u8> = self.buf.drain(..lf_index + 1).collect();
+            let bytes: Vec<u8> = self.buf.drain(..=lf_index).collect();
             let string = String::from_utf8_lossy(&bytes);
             Some(string.into_owned())
         } else {
@@ -136,7 +136,7 @@ impl RequestParser {
         if self.buf.is_empty() {
             None
         } else {
-            let bytes: Vec<u8> = self.buf.iter().copied().collect();
+            let bytes: Vec<u8> = self.buf.drain(..).collect();
             Some(String::from_utf8_lossy(&bytes).into_owned())
         }
     }
