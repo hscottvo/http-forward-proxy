@@ -1,7 +1,7 @@
 use crate::request::startline::StartLine;
 
 use super::Request;
-use eyre::{OptionExt, Result, bail};
+use eyre::{OptionExt, Result, bail, ensure};
 use std::collections::{HashMap, VecDeque};
 use tracing::{debug, instrument, warn};
 
@@ -39,17 +39,23 @@ impl RequestParser {
         while let Some(section) = self.capture_until_crlf() {
             debug!("{section:?}");
             self.parse_section(section)?;
-            if self.phase == ParsePhase::Finished {
-                return Ok(Some(Request::new(
-                    self.startline.clone().ok_or_eyre("missing startline")?,
-                    self.headers.clone(),
-                    self.body.clone(),
-                )));
-            }
         }
 
+        if self.phase == ParsePhase::Body
+            && let Some(section) = self.capture_all()
+        {
+            self.parse_section(section)?;
+        }
+        if self.phase == ParsePhase::Finished {
+            return Ok(Some(Request::new(
+                self.startline.clone().ok_or_eyre("missing startline")?,
+                self.headers.clone(),
+                self.body.clone(),
+            )));
+        }
         Ok(None)
     }
+    #[instrument(skip(self))]
     fn parse_section(&mut self, line: String) -> Result<()> {
         match self.phase {
             ParsePhase::StartLine => self.parse_startline(line)?,
@@ -69,16 +75,15 @@ impl RequestParser {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument()]
     fn parse_header(&mut self, line: String) -> Result<()> {
         let line = line.trim_matches(['\r', '\n']).to_owned();
         if line.is_empty() {
-            debug!("done parsing headers");
-            // This should probably be body or something?
             if contains_body(&self.headers) {
                 self.phase = ParsePhase::Body;
+            } else {
+                self.phase = ParsePhase::Finished;
             }
-            self.phase = ParsePhase::Finished;
             return Ok(());
         }
         let mut header = line.split(": ");
@@ -97,8 +102,18 @@ impl RequestParser {
     }
 
     #[instrument(skip(self))]
-    fn parse_body(&mut self, line: String) -> Result<()> {
-        debug!("parsing body");
+    fn parse_body(&mut self, body: String) -> Result<()> {
+        let content_length = self
+            .headers
+            .get("Content-Length")
+            .ok_or_eyre("missing Content-Length header")?
+            .parse::<usize>()?;
+        ensure!(
+            body.len() == content_length,
+            "bytes read do not match Content-Length header"
+        );
+        self.body = body;
+        self.phase = ParsePhase::Finished;
 
         Ok(())
     }
@@ -116,10 +131,19 @@ impl RequestParser {
             None
         }
     }
+
+    fn capture_all(&mut self) -> Option<String> {
+        if self.buf.is_empty() {
+            None
+        } else {
+            let bytes: Vec<u8> = self.buf.iter().copied().collect();
+            Some(String::from_utf8_lossy(&bytes).into_owned())
+        }
+    }
 }
 
 fn contains_body(headers: &HashMap<String, String>) -> bool {
-    false
+    headers.contains_key("Transfer-Encoding") || headers.contains_key("Content-Length")
 }
 
 #[cfg(test)]
