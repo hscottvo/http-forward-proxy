@@ -48,31 +48,10 @@ impl RequestParser {
     }
     #[instrument(skip(self))]
     fn parse_startline(&mut self, line: String) -> Result<()> {
-        let line = line.trim_matches(['\r', '\n']).to_owned();
-        let mut parts = line.split(' ');
-
-        let method = parts
-            .next()
-            .ok_or_eyre("invalid startline: missing method")?
-            .to_owned()
-            .parse()?;
-
-        let target = parts
-            .next()
-            .ok_or_eyre("invalid startline: missing target")?
-            .to_owned();
-
-        let version = parts
-            .next()
-            .ok_or_eyre("invalid startline: missing version")?
-            .parse()?;
-
-        ensure!(parts.next().is_none(), "invalid startline: extra parts");
-
+        self.startline = Some(line.parse()?);
         self.phase = ParsePhase::Headers;
-        self.startline = Some(StartLine::new(method, target, version));
 
-        debug!(startline = ?self.startline, "leksfjskld");
+        debug!(startline = ?self.startline);
 
         Ok(())
     }
