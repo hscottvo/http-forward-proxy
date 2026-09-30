@@ -10,12 +10,6 @@ use tracing::{debug, info};
 
 use crate::request::parser::RequestParser;
 
-const DUMMY_RESPONSE: &str = r#"HTTP/1.1 200 OK
-Content-Type: text/plain
-Content-Length: 5
-
-Hello"#;
-
 fn handle_client(mut stream: TcpStream) -> Result<()> {
     let mut parser = RequestParser::new();
     let mut buf = [1u8; 50];
@@ -26,7 +20,13 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
         }
     };
     debug!(request = %request);
-    stream.write_all(DUMMY_RESPONSE.as_bytes())?;
+
+    let mut x = TcpStream::connect("www.example.com:80")?;
+    let mut y = [0u8; 1000];
+    let a = x.write(&request.to_string().into_bytes())?;
+    debug!("wrote {:?} bytes to example.com", a);
+    let z = x.read(&mut y)?;
+    stream.write_all(&y[..z])?;
     stream.shutdown(Shutdown::Both)?;
     Ok(())
 }

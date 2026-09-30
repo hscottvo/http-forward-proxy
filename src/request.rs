@@ -28,6 +28,8 @@ impl Display for Request {
         for (field, value) in &self.headers {
             writeln!(f, "{}: {}", field, value)?;
         }
+        writeln!(f)?;
+        writeln!(f, "{}", self.body)?;
         Ok(())
     }
 }
