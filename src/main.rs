@@ -20,8 +20,8 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
     let mut parser = RequestParser::new();
     let mut buf = [1u8; 50];
     let request = loop {
-        stream.read_exact(&mut buf)?;
-        if let Some(response) = parser.push(&buf)? {
+        let bytes_read = stream.read(&mut buf)?;
+        if let Some(response) = parser.push(&buf[..bytes_read])? {
             break response;
         }
     };

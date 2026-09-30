@@ -1,9 +1,9 @@
 use crate::request::startline::StartLine;
 
 use super::Request;
-use eyre::{OptionExt as _, Result, ensure};
-use std::collections::VecDeque;
-use tracing::{debug, instrument};
+use eyre::{Result, bail};
+use std::collections::{HashMap, VecDeque};
+use tracing::{debug, instrument, warn};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ParsePhase {
@@ -16,6 +16,7 @@ pub struct RequestParser {
     buf: VecDeque<u8>,
     phase: ParsePhase,
     startline: Option<StartLine>,
+    headers: HashMap<String, String>,
 }
 
 impl RequestParser {
@@ -24,6 +25,7 @@ impl RequestParser {
             buf: VecDeque::new(),
             phase: ParsePhase::StartLine,
             startline: None,
+            headers: HashMap::new(),
         }
     }
     #[instrument(skip(self, buf), fields(phase = ?self.phase))]
@@ -59,7 +61,25 @@ impl RequestParser {
     #[instrument(skip(self))]
     fn parse_header(&mut self, line: String) -> Result<()> {
         let line = line.trim_matches(['\r', '\n']).to_owned();
-        Ok(())
+        if line.is_empty() {
+            // This should probably be body or something?
+            self.phase = ParsePhase::Finished;
+            debug!("done parsing headers");
+            return Ok(());
+        }
+        let mut header = line.split(": ");
+        if let Some(field) = header.next()
+            && let Some(value) = header.next()
+            && header.next().is_none()
+        {
+            debug!(field=?field, value=?value);
+            if let Some(old_value) = self.headers.insert(field.to_owned(), value.to_owned()) {
+                warn!("old value {old_value} overwritten for field {field}");
+            }
+            Ok(())
+        } else {
+            bail!("failed to parse header field")
+        }
     }
 
     fn capture_until_crlf(&mut self) -> Option<String> {
@@ -68,7 +88,6 @@ impl RequestParser {
             && let Some(&next) = self.buf.get(lf_index)
             && next == b'\n'
         {
-            debug!("CRLF found at index {:?} and {:?}", cr_index, cr_index + 1);
             let bytes: Vec<u8> = self.buf.drain(..lf_index + 1).collect();
             let string = String::from_utf8_lossy(&bytes);
             Some(string.into_owned())
@@ -80,6 +99,8 @@ impl RequestParser {
 
 #[cfg(test)]
 mod tests {
+
+    use std::collections::HashMap;
 
     use super::*;
 
@@ -112,6 +133,17 @@ mod tests {
         let mut parser = RequestParser::new();
         parser.push(b"GET http://example.com/ HTTP/1.1\r\n12345")?;
         assert_eq!(parser.buf, b"12345".as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn parse_header() -> Result<()> {
+        let mut parser = RequestParser::new();
+        parser.phase = ParsePhase::Headers;
+        parser.push(b"HOST: example.com\r\n")?;
+        let expected_headers = HashMap::from([("HOST".to_owned(), "example.com".to_owned())]);
+        assert_eq!(parser.headers, expected_headers);
+
         Ok(())
     }
 }
