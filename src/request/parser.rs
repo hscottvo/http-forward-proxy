@@ -47,11 +47,11 @@ impl RequestParser {
             self.parse_section(&section)?;
         }
         if self.phase == ParsePhase::Finished {
-            return Ok(Some(Request::new(
+            return Ok(Some(Request::try_new(
                 self.startline.clone().ok_or_eyre("missing startline")?,
                 self.headers.clone(),
                 self.body.clone(),
-            )));
+            )?));
         }
         Ok(None)
     }

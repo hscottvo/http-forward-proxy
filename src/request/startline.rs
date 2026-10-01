@@ -4,16 +4,17 @@ use std::str::FromStr;
 use thiserror::Error;
 
 use crate::request::method::{Method, MethodError};
+use crate::request::target::{Target, TargetError};
 use crate::types::{HttpVersion, HttpVersionError};
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct StartLine {
     method: Method,
-    target: String,
+    target: Target,
     version: HttpVersion,
 }
 impl StartLine {
-    pub const fn new(method: Method, target: String, version: HttpVersion) -> Self {
+    const fn new(method: Method, target: Target, version: HttpVersion) -> Self {
         Self {
             method,
             target,
@@ -44,7 +45,8 @@ impl FromStr for StartLine {
         let target = parts
             .next()
             .ok_or(StartLineError::MissingTarget)?
-            .to_owned();
+            .to_owned()
+            .parse()?;
 
         let version = parts
             .next()
@@ -66,6 +68,8 @@ pub enum StartLineError {
     MethodParse(#[from] MethodError),
     #[error("missing target")]
     MissingTarget,
+    #[error(transparent)]
+    TargetParse(#[from] TargetError),
     #[error("missing http version")]
     MissingHttpVersion,
     #[error(transparent)]
