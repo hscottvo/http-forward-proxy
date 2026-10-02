@@ -6,7 +6,7 @@ use std::{
     io::{Read, Write as _},
     net::{Shutdown, TcpListener, TcpStream},
 };
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::request::parser::RequestParser;
 
@@ -19,14 +19,14 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
             break response;
         }
     };
-    debug!(request = %request);
+    trace!(request = %request);
 
     let mut x = TcpStream::connect("www.example.com:80")?;
     let mut y = [0u8; 5000];
     let a = x.write(&request.to_string().into_bytes())?;
     debug!(bytes=?a, "wrote to example.com");
     let z = x.read(&mut y)?;
-    debug!(response=%String::from_utf8_lossy(&y[..]), response_bytes=?z, "received response");
+    trace!(response=%String::from_utf8_lossy(&y[..]), response_bytes=?z, "received response");
     stream.write_all(&y[..z])?;
     stream.shutdown(Shutdown::Both)?;
     Ok(())

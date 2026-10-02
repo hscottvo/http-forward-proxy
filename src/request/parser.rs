@@ -1,9 +1,9 @@
-use crate::request::startline::StartLine;
+use crate::request::{body::Body, startline::StartLine};
 
 use super::Request;
 use eyre::{OptionExt, Result, bail, ensure};
 use std::collections::{HashMap, VecDeque};
-use tracing::{debug, instrument, warn};
+use tracing::{debug, instrument, trace, warn};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ParsePhase {
@@ -18,7 +18,7 @@ pub struct RequestParser {
     phase: ParsePhase,
     startline: Option<StartLine>,
     headers: HashMap<String, String>,
-    body: String,
+    body: Option<Body>,
 }
 
 impl RequestParser {
@@ -28,7 +28,7 @@ impl RequestParser {
             phase: ParsePhase::StartLine,
             startline: None,
             headers: HashMap::new(),
-            body: String::new(),
+            body: None,
         }
     }
     #[instrument(skip(self, buf), fields(phase = ?self.phase))]
@@ -37,7 +37,7 @@ impl RequestParser {
             self.buf.push_back(byte);
         }
         while let Some(section) = self.capture_until_crlf() {
-            debug!("{section:?}");
+            trace!("{section:?}");
             self.parse_section(&section)?;
         }
 
@@ -61,7 +61,7 @@ impl RequestParser {
             ParsePhase::StartLine => self.parse_startline(line)?,
             ParsePhase::Headers => self.parse_header(line)?,
             ParsePhase::Body => self.parse_body(line)?,
-            ParsePhase::Finished => todo!(),
+            ParsePhase::Finished => {}
         }
         Ok(())
     }
@@ -70,7 +70,7 @@ impl RequestParser {
         self.startline = Some(line.parse()?);
         self.phase = ParsePhase::Headers;
 
-        debug!(startline = ?self.startline);
+        trace!(startline = ?self.startline);
 
         Ok(())
     }
@@ -91,7 +91,7 @@ impl RequestParser {
             && let Some(value) = header.next()
             && header.next().is_none()
         {
-            debug!(field=?field, value=?value);
+            trace!(field=?field, value=?value);
             if let Some(old_value) = self.headers.insert(field.to_owned(), value.to_owned()) {
                 warn!("old value {old_value} overwritten for field {field}");
             }
@@ -102,18 +102,21 @@ impl RequestParser {
     }
 
     #[instrument(skip(self))]
-    fn parse_body(&mut self, body: &str) -> Result<()> {
-        let content_length = self
-            .headers
-            .get("Content-Length")
-            .ok_or_eyre("missing Content-Length header")?
-            .parse::<usize>()?;
-        ensure!(
-            body.len() == content_length,
-            "bytes read do not match Content-Length header"
-        );
-        body.clone_into(&mut self.body);
-        self.phase = ParsePhase::Finished;
+    fn parse_body(&mut self, content: &str) -> Result<()> {
+        if self.body.is_none() {
+            let content_length = self
+                .headers
+                .get("Content-Length")
+                .ok_or_eyre("missing Content-Length header")?
+                .parse::<usize>()?;
+            self.body = Some(Body::new(content_length));
+        }
+        if let Some(body) = &mut self.body {
+            body.push(content)?;
+            if body.is_finished() {
+                self.phase = ParsePhase::Finished;
+            }
+        }
 
         Ok(())
     }
