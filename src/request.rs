@@ -2,8 +2,9 @@ use std::{collections::HashMap, fmt::Display};
 
 use thiserror::Error;
 
-use crate::request::startline::StartLine;
+use crate::request::{body::Body, startline::StartLine};
 
+mod body;
 mod method;
 pub mod parser;
 mod startline;
@@ -13,13 +14,13 @@ mod target;
 pub struct Request {
     startline: StartLine,
     headers: HashMap<String, String>,
-    body: String,
+    body: Option<Body>,
 }
 impl Request {
     pub fn try_new(
         startline: StartLine,
         headers: HashMap<String, String>,
-        body: String,
+        body: Option<Body>,
     ) -> Result<Self> {
         let request = Self {
             startline,
@@ -53,7 +54,9 @@ impl Display for Request {
             writeln!(f, "{field}: {value}")?;
         }
         writeln!(f)?;
-        writeln!(f, "{}", self.body)?;
+        if let Some(content) = &self.body {
+            writeln!(f, "{}", content)?;
+        }
         Ok(())
     }
 }
