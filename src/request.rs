@@ -55,7 +55,7 @@ impl Display for Request {
         }
         writeln!(f)?;
         if let Some(content) = &self.body {
-            writeln!(f, "{}", content)?;
+            writeln!(f, "{content}")?;
         }
         Ok(())
     }
