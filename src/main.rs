@@ -21,10 +21,10 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
     };
     trace!(request = %request);
 
-    let mut x = TcpStream::connect("www.example.com:80")?;
+    let mut x = TcpStream::connect("httpbin.org:80")?;
     let mut y = [0u8; 5000];
     let a = x.write(&request.to_string().into_bytes())?;
-    debug!(bytes=?a, "wrote to example.com");
+    debug!(bytes=?a, "wrote to httpbin.org");
     let z = x.read(&mut y)?;
     trace!(response=%String::from_utf8_lossy(&y[..]), response_bytes=?z, "received response");
     stream.write_all(&y[..z])?;

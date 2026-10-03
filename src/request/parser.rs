@@ -1,9 +1,9 @@
 use crate::request::{body::Body, startline::StartLine};
 
 use super::Request;
-use eyre::{OptionExt, Result, bail, ensure};
+use eyre::{OptionExt, Result, bail};
 use std::collections::{HashMap, VecDeque};
-use tracing::{debug, instrument, trace, warn};
+use tracing::{instrument, trace, warn};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ParsePhase {
@@ -44,7 +44,7 @@ impl RequestParser {
         if self.phase == ParsePhase::Body
             && let Some(section) = self.capture_all()
         {
-            self.parse_section(&section)?;
+            self.parse_body(&section)?;
         }
         if self.phase == ParsePhase::Finished {
             return Ok(Some(Request::try_new(
@@ -60,7 +60,7 @@ impl RequestParser {
         match self.phase {
             ParsePhase::StartLine => self.parse_startline(line)?,
             ParsePhase::Headers => self.parse_header(line)?,
-            ParsePhase::Body => self.parse_body(line)?,
+            ParsePhase::Body => bail!("tried parsing to crlf for body"),
             ParsePhase::Finished => {}
         }
         Ok(())
