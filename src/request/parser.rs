@@ -32,7 +32,7 @@ impl RequestParser {
         }
     }
     #[instrument(skip(self, buf), fields(phase = ?self.phase))]
-    pub fn push(&mut self, buf: &[u8]) -> Result<Option<Request>> {
+    pub fn push(&mut self, buf: &[u8]) -> Result<Vec<Request>> {
         for &byte in buf {
             self.buf.push_back(byte);
         }
@@ -47,13 +47,13 @@ impl RequestParser {
             self.parse_body(&section)?;
         }
         if self.phase == ParsePhase::Finished {
-            return Ok(Some(Request::try_new(
+            return Ok(vec![Request::try_new(
                 self.startline.clone().ok_or_eyre("missing startline")?,
                 self.headers.clone(),
                 self.body.clone(),
-            )?));
+            )?]);
         }
-        Ok(None)
+        Ok(vec![])
     }
     #[instrument(skip(self))]
     fn parse_section(&mut self, line: &str) -> Result<()> {
@@ -185,6 +185,27 @@ mod tests {
         let mut parser = RequestParser::new();
         parser.push(b"GET http://example.com/ HTTP/1.1\r\n12345")?;
         assert_eq!(parser.buf, b"12345".as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_section_parsing_for_body() -> Result<()> {
+        let mut parser = RequestParser::new();
+        parser.push(
+            b"GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\n\r\n",
+        )?;
+        assert_eq!(parser.phase, ParsePhase::Body);
+        let request = parser.push(b"hello")?;
+        assert_eq!(parser.phase, ParsePhase::Finished);
+        assert_eq!(request.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn retains_extra_bytes_after_parse_body() -> Result<()> {
+        let mut parser = RequestParser::new();
+        parser.push(b"GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\n\r\nhelloGET")?;
+        assert_eq!(parser.buf, b"GET".as_slice());
         Ok(())
     }
 
