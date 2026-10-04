@@ -3,7 +3,7 @@ use crate::request::{body::Body, startline::StartLine};
 use super::Request;
 use eyre::{OptionExt, Result, bail};
 use std::collections::{HashMap, VecDeque};
-use tracing::{instrument, trace, warn};
+use tracing::{debug, instrument, trace, warn};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ParsePhase {
@@ -33,12 +33,35 @@ impl RequestParser {
     }
     #[instrument(skip(self, buf), fields(phase = ?self.phase))]
     pub fn push(&mut self, buf: &[u8]) -> Result<Vec<Request>> {
+        let buf_string = String::from_utf8_lossy_owned(buf.to_vec());
+        debug!(buffer = buf_string);
         for &byte in buf {
             self.buf.push_back(byte);
         }
-        while let Some(section) = self.capture_until_crlf() {
-            trace!("{section:?}");
-            self.parse_section(&section)?;
+        let mut ret = Vec::new();
+        while let Some(request) = self.parse()? {
+            trace!(request = %request, buffer_length = self.buf_len());
+            ret.push(request);
+        }
+        Ok(ret)
+    }
+
+    #[instrument(skip(self))]
+    fn parse(&mut self) -> Result<Option<Request>> {
+        // while let Some(section) = self.capture_until_crlf() {
+        //     trace!(section);
+        //     self.parse_section(&section)?;
+        // }
+        if self.phase == ParsePhase::StartLine
+            && let Some(section) = self.capture_until_crlf()
+        {
+            self.parse_startline(&section)?;
+        }
+
+        while self.phase == ParsePhase::Headers
+            && let Some(header) = self.capture_until_crlf()
+        {
+            self.parse_header(&header)?;
         }
 
         if self.phase == ParsePhase::Body
@@ -53,9 +76,9 @@ impl RequestParser {
                 self.body.clone(),
             )?;
             self.reset();
-            return Ok(vec![request]);
+            return Ok(Some(request));
         }
-        Ok(vec![])
+        Ok(None)
     }
     #[instrument(skip(self))]
     fn parse_section(&mut self, line: &str) -> Result<()> {
@@ -77,7 +100,7 @@ impl RequestParser {
         Ok(())
     }
 
-    #[instrument()]
+    #[instrument(skip(self))]
     fn parse_header(&mut self, line: &str) -> Result<()> {
         let line = line.trim_matches(['\r', '\n']).to_owned();
         if line.is_empty() {
@@ -95,7 +118,7 @@ impl RequestParser {
         {
             trace!(field=?field, value=?value);
             if let Some(old_value) = self.headers.insert(field.to_owned(), value.to_owned()) {
-                warn!("old value {old_value} overwritten for field {field}");
+                warn!(old_value, "value overwritten for field {field}");
             }
             Ok(())
         } else {
@@ -151,6 +174,9 @@ impl RequestParser {
         self.startline = None;
         self.headers = HashMap::new();
         self.body = None;
+    }
+    pub fn buf_len(&self) -> usize {
+        self.buf.len()
     }
 }
 
