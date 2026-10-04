@@ -48,25 +48,15 @@ impl RequestParser {
 
     #[instrument(skip(self))]
     fn parse(&mut self) -> Result<Option<Request>> {
-        // while let Some(section) = self.capture_until_crlf() {
-        //     trace!(section);
-        //     self.parse_section(&section)?;
-        // }
-        if self.phase == ParsePhase::StartLine
-            && let Some(section) = self.capture_until_crlf()
-        {
-            self.parse_startline(&section)?;
+        if self.phase == ParsePhase::StartLine {
+            self.parse_startline()?;
         }
 
-        while self.phase == ParsePhase::Headers
-            && let Some(header) = self.capture_until_crlf()
-        {
-            self.parse_header(&header)?;
+        while self.phase == ParsePhase::Headers {
+            self.parse_header()?;
         }
 
-        if self.phase == ParsePhase::Body
-        // && let Some(section) = self.capture_all()
-        {
+        if self.phase == ParsePhase::Body {
             self.parse_body()?;
         }
         if self.phase == ParsePhase::Finished {
@@ -80,18 +70,12 @@ impl RequestParser {
         }
         Ok(None)
     }
+
     #[instrument(skip(self))]
-    fn parse_section(&mut self, line: &str) -> Result<()> {
-        match self.phase {
-            ParsePhase::StartLine => self.parse_startline(line)?,
-            ParsePhase::Headers => self.parse_header(line)?,
-            ParsePhase::Body => bail!("tried parsing to crlf for body"),
-            ParsePhase::Finished => {}
-        }
-        Ok(())
-    }
-    #[instrument(skip(self))]
-    fn parse_startline(&mut self, line: &str) -> Result<()> {
+    fn parse_startline(&mut self) -> Result<()> {
+        let Some(line) = self.capture_until_crlf() else {
+            return Ok(());
+        };
         self.startline = Some(line.parse()?);
         self.phase = ParsePhase::Headers;
 
@@ -101,7 +85,10 @@ impl RequestParser {
     }
 
     #[instrument(skip(self))]
-    fn parse_header(&mut self, line: &str) -> Result<()> {
+    fn parse_header(&mut self) -> Result<()> {
+        let Some(line) = self.capture_until_crlf() else {
+            return Ok(());
+        };
         let line = line.trim_matches(['\r', '\n']).to_owned();
         if line.is_empty() {
             if contains_body(&self.headers) {
@@ -180,15 +167,6 @@ impl RequestParser {
         }
     }
 
-    fn capture_all(&mut self) -> Option<String> {
-        if self.buf.is_empty() {
-            None
-        } else {
-            let bytes: Vec<u8> = self.buf.drain(..).collect();
-            Some(String::from_utf8_lossy(&bytes).into_owned())
-        }
-    }
-
     fn reset(&mut self) {
         self.phase = ParsePhase::StartLine;
         self.startline = None;
@@ -251,7 +229,7 @@ mod tests {
         )?;
         assert_eq!(parser.phase, ParsePhase::Body);
         let request = parser.push(b"hello")?;
-        assert_eq!(parser.phase, ParsePhase::Finished);
+        assert_eq!(parser.phase, ParsePhase::StartLine);
         assert_eq!(request.len(), 1);
         Ok(())
     }
