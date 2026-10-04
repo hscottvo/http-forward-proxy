@@ -29,6 +29,10 @@ impl Body {
         Ok(())
     }
 
+    pub const fn left_to_read(&self) -> usize {
+        self.left_to_read
+    }
+
     pub const fn is_finished(&self) -> bool {
         self.left_to_read == 0
     }
