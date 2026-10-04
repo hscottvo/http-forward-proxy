@@ -65,9 +65,9 @@ impl RequestParser {
         }
 
         if self.phase == ParsePhase::Body
-            && let Some(section) = self.capture_all()
+        // && let Some(section) = self.capture_all()
         {
-            self.parse_body(&section)?;
+            self.parse_body()?;
         }
         if self.phase == ParsePhase::Finished {
             let request = Request::try_new(
@@ -127,7 +127,7 @@ impl RequestParser {
     }
 
     #[instrument(skip(self))]
-    fn parse_body(&mut self, content: &str) -> Result<()> {
+    fn parse_body(&mut self) -> Result<()> {
         if self.body.is_none() {
             let content_length = self
                 .headers
@@ -136,11 +136,22 @@ impl RequestParser {
                 .parse::<usize>()?;
             self.body = Some(Body::new(content_length));
         }
-        if let Some(body) = &mut self.body {
-            body.push(content)?;
-            if body.is_finished() {
-                self.phase = ParsePhase::Finished;
-            }
+
+        let body = self
+            .body
+            .as_ref()
+            .ok_or_eyre("failed to get body field from parser state")?;
+        let amount_to_read = body.left_to_read();
+        let Some(content) = self.capture_exact(amount_to_read) else {
+            return Ok(());
+        };
+        let body = self
+            .body
+            .as_mut()
+            .ok_or_eyre("failed to get body field from parser state")?;
+        body.push(content)?;
+        if body.is_finished() {
+            self.phase = ParsePhase::Finished;
         }
 
         Ok(())
@@ -157,6 +168,15 @@ impl RequestParser {
             Some(string.into_owned())
         } else {
             None
+        }
+    }
+
+    fn capture_exact(&mut self, num_bytes: usize) -> Option<String> {
+        if self.buf.is_empty() {
+            None
+        } else {
+            let bytes: Vec<u8> = self.buf.drain(..num_bytes).collect();
+            Some(String::from_utf8_lossy(&bytes).into_owned())
         }
     }
 
