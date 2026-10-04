@@ -47,11 +47,13 @@ impl RequestParser {
             self.parse_body(&section)?;
         }
         if self.phase == ParsePhase::Finished {
-            return Ok(vec![Request::try_new(
+            let request = Request::try_new(
                 self.startline.clone().ok_or_eyre("missing startline")?,
                 self.headers.clone(),
                 self.body.clone(),
-            )?]);
+            )?;
+            self.reset();
+            return Ok(vec![request]);
         }
         Ok(vec![])
     }
@@ -142,6 +144,13 @@ impl RequestParser {
             let bytes: Vec<u8> = self.buf.drain(..).collect();
             Some(String::from_utf8_lossy(&bytes).into_owned())
         }
+    }
+
+    fn reset(&mut self) {
+        self.phase = ParsePhase::StartLine;
+        self.startline = None;
+        self.headers = HashMap::new();
+        self.body = None;
     }
 }
 
