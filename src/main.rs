@@ -30,13 +30,18 @@ fn forward_response(stream: &mut TcpStream, response: impl Into<String>) -> Resu
 
 fn handle_client(mut stream: TcpStream) -> Result<()> {
     let mut parser = RequestParser::new();
-    let mut buf = [1u8; 50];
+    let mut buf = [1u8; 5000];
     loop {
         let bytes_read = stream.read(&mut buf)?;
         if bytes_read == 0 {
             break;
         }
         let requests = parser.push(&buf[..bytes_read])?;
+        debug!(
+            ?requests,
+            num_requests = requests.len(),
+            parse_buf_len = parser.buf_len()
+        );
         for request in requests {
             let response = forward_request(&request)?;
             forward_response(&mut stream, response)?;
