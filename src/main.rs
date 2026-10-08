@@ -6,7 +6,7 @@ use std::{
     io::{Read, Write as _},
     net::{TcpListener, TcpStream},
 };
-use tracing::{debug, info, trace};
+use tracing::{debug, info, instrument, trace};
 
 use crate::request::{Request, parser::RequestParser};
 
@@ -28,10 +28,12 @@ fn forward_response(stream: &mut TcpStream, response: impl Into<String>) -> Resu
     Ok(())
 }
 
+#[instrument(skip(stream))]
 fn handle_client(mut stream: TcpStream) -> Result<()> {
     let mut parser = RequestParser::new();
     let mut buf = [1u8; 5000];
     loop {
+        trace!("loop");
         let bytes_read = stream.read(&mut buf)?;
         if bytes_read == 0 {
             break;
