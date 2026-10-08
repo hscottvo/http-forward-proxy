@@ -48,12 +48,16 @@ impl RequestParser {
 
     #[instrument(skip(self))]
     fn parse(&mut self) -> Result<Option<Request>> {
-        if self.phase == ParsePhase::StartLine {
-            self.parse_startline()?;
+        if self.phase == ParsePhase::StartLine
+            && let Some(line) = self.capture_until_crlf()
+        {
+            self.parse_startline(line)?;
         }
 
-        while self.phase == ParsePhase::Headers {
-            self.parse_header()?;
+        while self.phase == ParsePhase::Headers
+            && let Some(line) = self.capture_until_crlf()
+        {
+            self.parse_header(line)?;
         }
 
         if self.phase == ParsePhase::Body {
@@ -71,12 +75,9 @@ impl RequestParser {
         Ok(None)
     }
 
-    #[instrument(skip(self))]
-    fn parse_startline(&mut self) -> Result<()> {
-        let Some(line) = self.capture_until_crlf() else {
-            return Ok(());
-        };
-        self.startline = Some(line.parse()?);
+    #[instrument(skip(self, line), fields(line=line.as_ref()))]
+    fn parse_startline(&mut self, line: impl AsRef<str>) -> Result<()> {
+        self.startline = Some(line.as_ref().parse()?);
         self.phase = ParsePhase::Headers;
 
         trace!(startline = ?self.startline);
@@ -84,12 +85,9 @@ impl RequestParser {
         Ok(())
     }
 
-    #[instrument(skip(self))]
-    fn parse_header(&mut self) -> Result<()> {
-        let Some(line) = self.capture_until_crlf() else {
-            return Ok(());
-        };
-        let line = line.trim_matches(['\r', '\n']).to_owned();
+    #[instrument(skip(self, line), fields(line=line.as_ref()))]
+    fn parse_header(&mut self, line: impl AsRef<str>) -> Result<()> {
+        let line = line.as_ref().trim_matches(['\r', '\n']).to_owned();
         if line.is_empty() {
             if contains_body(&self.headers) {
                 self.phase = ParsePhase::Body;
