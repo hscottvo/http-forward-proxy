@@ -87,7 +87,7 @@ impl RequestParser {
 
     #[instrument(skip(self, line), fields(line=line.as_ref()))]
     fn parse_header(&mut self, line: impl AsRef<str>) -> Result<()> {
-        let line = line.as_ref().trim_matches(['\r', '\n']).to_owned();
+        let line = line.as_ref();
         if line.is_empty() {
             if contains_body(&self.headers) {
                 self.phase = ParsePhase::Body;
@@ -150,7 +150,7 @@ impl RequestParser {
         {
             let bytes: Vec<u8> = self.buf.drain(..=lf_index).collect();
             let string = String::from_utf8_lossy(&bytes);
-            Some(string.into_owned())
+            Some(string.trim_matches(['\r', '\n']).to_owned())
         } else {
             None
         }
