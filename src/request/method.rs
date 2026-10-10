@@ -71,12 +71,19 @@ mod tests {
     use super::*;
     #[test]
     fn method_parse_roundtrip() -> Result<()> {
-        let methods = [Method::Get, Method::Put, Method::Post, Method::Delete];
-        for method in methods {
-            let method_string = method.to_string();
-            let parsed_method = method_string.parse()?;
-            assert_eq!(method, parsed_method);
+        let methods = [
+            (Method::Get, "GET"),
+            (Method::Put, "PUT"),
+            (Method::Post, "POST"),
+            (Method::Delete, "DELETE"),
+        ];
+
+        for (method, expected) in methods {
+            assert_eq!(method.to_string(), expected);
+            assert_eq!(expected.parse::<Method>()?, method);
+            assert_eq!(method.to_string().parse::<Method>()?, method);
         }
+
         Ok(())
     }
 

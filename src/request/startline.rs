@@ -163,6 +163,7 @@ mod tests {
     fn startline_round_trip() -> Result<()> {
         let startline = StartLine::new("GET".parse()?, "/".parse()?, "HTTP/1.1".parse()?);
         let startline_string = startline.to_string();
+        assert_eq!(startline_string, "GET / HTTP/1.1");
         assert_eq!(startline_string.parse::<StartLine>()?, startline);
         Ok(())
     }
