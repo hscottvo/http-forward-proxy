@@ -1,4 +1,4 @@
-use crate::request::{body::Body, startline::StartLine};
+use crate::{body::Body, request::startline::StartLine};
 
 use super::Request;
 use eyre::{OptionExt, Result, bail};
@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use tracing::{debug, instrument, trace, warn};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub enum ParsePhase {
+enum ParsePhase {
     StartLine,
     Headers,
     Body,
@@ -67,6 +67,10 @@ impl RequestParser {
             let request = Request::try_new(
                 self.startline.clone().ok_or_eyre("missing startline")?,
                 self.headers.clone(),
+                self.headers
+                    .get("Host")
+                    .ok_or_eyre("missing host header")?
+                    .clone(),
                 self.body.clone(),
             )?;
             self.reset();
@@ -265,8 +269,9 @@ mod tests {
             HttpVersion::Http1_1,
         );
 
+        let host = "httpbin.org";
         let headers_a = hash_map! {
-            "Host".to_owned() => "httpbin.org".to_owned(),
+            "Host".to_owned() => host.to_owned(),
                 "Content-Length".to_owned() => "5".to_owned()
         };
         let mut body_a = Body::new(5);
@@ -275,6 +280,7 @@ mod tests {
         let request_a = Request {
             startline: startline_a,
             headers: headers_a,
+            host: host.to_owned(),
             body: Some(body_a),
         };
 

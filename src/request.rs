@@ -2,9 +2,8 @@ use std::{collections::HashMap, fmt::Display};
 
 use thiserror::Error;
 
-use crate::request::{body::Body, startline::StartLine};
+use crate::{body::Body, request::startline::StartLine};
 
-mod body;
 mod method;
 pub mod parser;
 mod startline;
@@ -14,17 +13,20 @@ mod target;
 pub struct Request {
     startline: StartLine,
     headers: HashMap<String, String>,
+    host: String,
     body: Option<Body>,
 }
 impl Request {
     pub fn try_new(
         startline: StartLine,
         headers: HashMap<String, String>,
+        host: String,
         body: Option<Body>,
     ) -> Result<Self> {
         let request = Self {
             startline,
             headers,
+            host,
             body,
         };
         request.require_host()?;
@@ -36,6 +38,10 @@ impl Request {
             Some(_) => Ok(()),
             None => Err(RequestError::MissingHost),
         }
+    }
+
+    pub fn host(&self) -> &str {
+        &self.host
     }
 }
 

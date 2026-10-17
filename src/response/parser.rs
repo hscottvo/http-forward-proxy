@@ -1,0 +1,185 @@
+use crate::{body::Body, response::statusline::StatusLine};
+
+use super::Response;
+use eyre::{OptionExt, Result, bail};
+use std::collections::{HashMap, VecDeque};
+use tracing::{debug, instrument, trace, warn};
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+enum ParsePhase {
+    StartLine,
+    Headers,
+    Body,
+    Finished,
+}
+#[derive(Clone, Debug)]
+pub struct ResponseParser {
+    buf: VecDeque<u8>,
+    phase: ParsePhase,
+    status_line: Option<StatusLine>,
+    headers: HashMap<String, String>,
+    body: Option<Body>,
+}
+
+impl ResponseParser {
+    pub fn new() -> Self {
+        Self {
+            buf: VecDeque::new(),
+            phase: ParsePhase::StartLine,
+            status_line: None,
+            headers: HashMap::new(),
+            body: None,
+        }
+    }
+    #[instrument(skip(self, buf), fields(phase = ?self.phase))]
+    pub fn push(&mut self, buf: &[u8]) -> Result<Vec<Response>> {
+        let buf_string = String::from_utf8_lossy_owned(buf.to_vec());
+        debug!(buffer = buf_string);
+        for &byte in buf {
+            self.buf.push_back(byte);
+        }
+        let mut ret = Vec::new();
+        while let Some(request) = self.parse()? {
+            trace!(request = %request, buffer_length = self.buf_len());
+            ret.push(request);
+        }
+        Ok(ret)
+    }
+
+    #[instrument(skip(self))]
+    fn parse(&mut self) -> Result<Option<Response>> {
+        if self.phase == ParsePhase::StartLine
+            && let Some(line) = self.capture_until_crlf()
+        {
+            self.parse_startline(line)?;
+        }
+
+        while self.phase == ParsePhase::Headers
+            && let Some(line) = self.capture_until_crlf()
+        {
+            self.parse_header(line)?;
+        }
+
+        if self.phase == ParsePhase::Body {
+            self.parse_body()?;
+        }
+        if self.phase == ParsePhase::Finished {
+            let request = Response::try_new(
+                self.status_line.clone().ok_or_eyre("missing startline")?,
+                self.headers.clone(),
+                self.headers
+                    .get("Host")
+                    .ok_or_eyre("missing host header")?
+                    .clone(),
+                self.body.clone(),
+            )?;
+            self.reset();
+            return Ok(Some(request));
+        }
+        Ok(None)
+    }
+
+    #[instrument(skip(self, line), fields(line=line.as_ref()))]
+    fn parse_startline(&mut self, line: impl AsRef<str>) -> Result<()> {
+        self.status_line = Some(line.as_ref().parse()?);
+        self.phase = ParsePhase::Headers;
+
+        trace!(startline = ?self.status_line);
+
+        Ok(())
+    }
+
+    #[instrument(skip(self, line), fields(line=line.as_ref()))]
+    fn parse_header(&mut self, line: impl AsRef<str>) -> Result<()> {
+        let line = line.as_ref();
+        if line.is_empty() {
+            if contains_body(&self.headers) {
+                self.phase = ParsePhase::Body;
+            } else {
+                self.phase = ParsePhase::Finished;
+            }
+            return Ok(());
+        }
+        let mut header = line.split(": ");
+        if let Some(field) = header.next()
+            && let Some(value) = header.next()
+            && header.next().is_none()
+        {
+            trace!(field=?field, value=?value);
+            if let Some(old_value) = self.headers.insert(field.to_owned(), value.to_owned()) {
+                warn!(old_value, "value overwritten for field {field}");
+            }
+            Ok(())
+        } else {
+            bail!("failed to parse header field")
+        }
+    }
+
+    #[instrument(skip(self))]
+    fn parse_body(&mut self) -> Result<()> {
+        if self.body.is_none() {
+            let content_length = self
+                .headers
+                .get("Content-Length")
+                .ok_or_eyre("missing Content-Length header")?
+                .parse::<usize>()?;
+            self.body = Some(Body::new(content_length));
+        }
+
+        let body = self
+            .body
+            .as_ref()
+            .ok_or_eyre("failed to get body field from parser state")?;
+        let amount_to_read = body.left_to_read();
+        let Some(content) = self.capture_exact(amount_to_read) else {
+            return Ok(());
+        };
+        let body = self
+            .body
+            .as_mut()
+            .ok_or_eyre("failed to get body field from parser state")?;
+        body.push(content)?;
+        if body.is_finished() {
+            self.phase = ParsePhase::Finished;
+        }
+
+        Ok(())
+    }
+
+    fn capture_until_crlf(&mut self) -> Option<String> {
+        if let Some(cr_index) = self.buf.iter().position(|&x| x == b'\r')
+            && let lf_index = cr_index + 1
+            && let Some(&next) = self.buf.get(lf_index)
+            && next == b'\n'
+        {
+            let bytes: Vec<u8> = self.buf.drain(..=lf_index).collect();
+            let string = String::from_utf8_lossy(&bytes);
+            Some(string.trim_matches(['\r', '\n']).to_owned())
+        } else {
+            None
+        }
+    }
+
+    fn capture_exact(&mut self, num_bytes: usize) -> Option<String> {
+        if self.buf.is_empty() {
+            None
+        } else {
+            let bytes: Vec<u8> = self.buf.drain(..num_bytes).collect();
+            Some(String::from_utf8_lossy(&bytes).into_owned())
+        }
+    }
+
+    fn reset(&mut self) {
+        self.phase = ParsePhase::StartLine;
+        self.status_line = None;
+        self.headers = HashMap::new();
+        self.body = None;
+    }
+    pub fn buf_len(&self) -> usize {
+        self.buf.len()
+    }
+}
+
+fn contains_body(headers: &HashMap<String, String>) -> bool {
+    headers.contains_key("Transfer-Encoding") || headers.contains_key("Content-Length")
+}

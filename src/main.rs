@@ -1,4 +1,5 @@
 #![cfg_attr(test, feature(hash_map_macro))]
+mod body;
 mod request;
 mod response;
 mod types;
@@ -13,13 +14,20 @@ use crate::request::{Request, parser::RequestParser};
 
 fn forward_request(request: &Request) -> Result<String> {
     debug!(request=%request);
-    let mut stream = TcpStream::connect("httpbin.org:80")?;
+    let host = request.host().to_owned() + ":80";
+    let mut stream = TcpStream::connect(host)?;
     let mut buffer = [0u8; 50];
     stream.write_all(request.to_string().as_bytes())?;
-    let response_bytes = stream.read(&mut buffer)?;
 
-    let response = String::from_utf8_lossy(&buffer[..response_bytes]).to_string();
-    trace!(response=%response, response_bytes, "received response");
+    let mut response = String::new();
+    while let response_bytes = stream.read(&mut buffer)?
+        && response_bytes > 0
+    {
+        debug!(bytes = response_bytes, "fuck 2");
+        let chunk_string = String::from_utf8_lossy(&buffer[..response_bytes]);
+        response.push_str(&chunk_string);
+    }
+
     Ok(response)
 }
 
@@ -47,6 +55,7 @@ fn handle_client(mut stream: TcpStream) -> Result<()> {
         );
         for request in requests {
             let response = forward_request(&request)?;
+            debug!(response=%response, "received response");
             forward_response(&mut stream, response)?;
         }
     }
