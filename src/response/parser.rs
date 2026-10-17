@@ -1,4 +1,4 @@
-use crate::{body::Body, response::statusline::StatusLine};
+use crate::{body::Body, response::status_line::StatusLine};
 
 use super::Response;
 use eyre::{OptionExt, Result, bail};

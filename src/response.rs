@@ -1,9 +1,9 @@
 mod parser;
 mod status_code;
-mod statusline;
+mod status_line;
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{body::Body, response::statusline::StatusLine};
+use crate::{body::Body, response::status_line::StatusLine};
 pub use parser::ResponseParser;
 
 #[derive(Debug, PartialEq, Eq)]
