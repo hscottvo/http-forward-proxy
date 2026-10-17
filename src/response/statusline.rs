@@ -79,10 +79,12 @@ type Result<T> = std::result::Result<T, StatusLineError>;
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     #[test]
-    fn parse_valid_status_line() -> Result<()> {
+    fn parse_status_line() -> Result<()> {
         let string = "HTTP/1.1 201 Created";
         let status_line: StatusLine = string.parse()?;
         let expected = StatusLine {
@@ -94,5 +96,55 @@ mod tests {
         assert_eq!(expected, status_line);
 
         Ok(())
+    }
+
+    #[test]
+    fn parse_status_line_without_reason_phrase() -> Result<()> {
+        let string = "HTTP/1.1 201 ";
+        let status_line: StatusLine = string.parse()?;
+        let expected = StatusLine {
+            version: HttpVersion::Http1_1,
+            status: StatusCode::Created,
+            reason_phrase: String::new(),
+        };
+
+        assert_eq!(expected, status_line);
+
+        Ok(())
+    }
+
+    #[test]
+    fn missing_version() {
+        let string = "";
+        let result: Result<StatusLine> = string.parse();
+        assert_matches!(result, Err(StatusLineError::MissingHttpVersion));
+    }
+
+    #[test]
+    fn bad_version() {
+        let string = "bad_version ";
+        let result: Result<StatusLine> = string.parse();
+        assert_matches!(result, Err(StatusLineError::HttpParse(_)));
+    }
+
+    #[test]
+    fn missing_status() {
+        let string = "HTTP/1.1";
+        let result: Result<StatusLine> = string.parse();
+        assert_matches!(result, Err(StatusLineError::MissingStatus));
+    }
+
+    #[test]
+    fn bad_status() {
+        let string = "HTTP/1.1 hi ";
+        let result: Result<StatusLine> = string.parse();
+        assert_matches!(result, Err(StatusLineError::StatusParse(_)));
+    }
+
+    #[test]
+    fn missing_reason_phrase() {
+        let string = "HTTP/1.1 200";
+        let result: Result<StatusLine> = string.parse();
+        assert_matches!(result, Err(StatusLineError::MissingReasonPhrase));
     }
 }
