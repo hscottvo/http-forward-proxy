@@ -10,7 +10,10 @@ use std::{
 };
 use tracing::{debug, info, instrument, trace};
 
-use crate::request::{Request, parser::RequestParser};
+use crate::{
+    request::{Request, parser::RequestParser},
+    response::ResponseParser,
+};
 
 fn forward_request(request: &Request) -> Result<String> {
     debug!(request=%request);
@@ -20,11 +23,13 @@ fn forward_request(request: &Request) -> Result<String> {
     stream.write_all(request.to_string().as_bytes())?;
 
     let mut response = String::new();
+    let mut response_parser = ResponseParser::new();
     while let response_bytes = stream.read(&mut buffer)?
         && response_bytes > 0
     {
         debug!(bytes = response_bytes, "fuck 2");
         let chunk_string = String::from_utf8_lossy(&buffer[..response_bytes]);
+        response_parser.push(&buffer[..response_bytes])?;
         response.push_str(&chunk_string);
     }
 

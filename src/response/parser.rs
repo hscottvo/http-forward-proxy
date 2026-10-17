@@ -51,7 +51,7 @@ impl ResponseParser {
         if self.phase == ParsePhase::StartLine
             && let Some(line) = self.capture_until_crlf()
         {
-            self.parse_startline(line)?;
+            self.parse_status_line(line)?;
         }
 
         while self.phase == ParsePhase::Headers
@@ -64,7 +64,7 @@ impl ResponseParser {
             self.parse_body()?;
         }
         if self.phase == ParsePhase::Finished {
-            let request = Response::try_new(
+            let request = Response::new(
                 self.status_line.clone().ok_or_eyre("missing startline")?,
                 self.headers.clone(),
                 self.headers
@@ -72,7 +72,7 @@ impl ResponseParser {
                     .ok_or_eyre("missing host header")?
                     .clone(),
                 self.body.clone(),
-            )?;
+            );
             self.reset();
             return Ok(Some(request));
         }
@@ -80,7 +80,7 @@ impl ResponseParser {
     }
 
     #[instrument(skip(self, line), fields(line=line.as_ref()))]
-    fn parse_startline(&mut self, line: impl AsRef<str>) -> Result<()> {
+    fn parse_status_line(&mut self, line: impl AsRef<str>) -> Result<()> {
         self.status_line = Some(line.as_ref().parse()?);
         self.phase = ParsePhase::Headers;
 
@@ -93,7 +93,7 @@ impl ResponseParser {
     fn parse_header(&mut self, line: impl AsRef<str>) -> Result<()> {
         let line = line.as_ref();
         if line.is_empty() {
-            if contains_body(&self.headers) {
+            if contains_body() {
                 self.phase = ParsePhase::Body;
             } else {
                 self.phase = ParsePhase::Finished;
@@ -180,6 +180,6 @@ impl ResponseParser {
     }
 }
 
-fn contains_body(headers: &HashMap<String, String>) -> bool {
-    headers.contains_key("Transfer-Encoding") || headers.contains_key("Content-Length")
+const fn contains_body() -> bool {
+    false
 }

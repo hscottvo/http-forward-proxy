@@ -18,7 +18,7 @@ pub type Result<T> = std::result::Result<T, MethodError>;
 
 #[derive(Error, Debug)]
 pub enum MethodError {
-    #[error("method not support: {0}")]
+    #[error("method not supported: {0}")]
     NotSupported(String),
 }
 

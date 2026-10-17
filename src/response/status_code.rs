@@ -45,6 +45,6 @@ impl FromStr for StatusCode {
 
 impl Display for StatusCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", u16::from(self.clone()))
+        write!(f, "{}", u16::from(*self))
     }
 }
