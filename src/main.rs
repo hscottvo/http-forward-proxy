@@ -1,3 +1,4 @@
+#![cfg_attr(test, feature(hash_map_macro))]
 mod request;
 mod response;
 mod types;
@@ -13,7 +14,7 @@ use crate::request::{Request, parser::RequestParser};
 fn forward_request(request: &Request) -> Result<String> {
     debug!(request=%request);
     let mut stream = TcpStream::connect("httpbin.org:80")?;
-    let mut buffer = [0u8; 5000];
+    let mut buffer = [0u8; 50];
     stream.write_all(request.to_string().as_bytes())?;
     let response_bytes = stream.read(&mut buffer)?;
 

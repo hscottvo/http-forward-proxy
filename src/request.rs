@@ -10,7 +10,7 @@ pub mod parser;
 mod startline;
 mod target;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Request {
     startline: StartLine,
     headers: HashMap<String, String>,

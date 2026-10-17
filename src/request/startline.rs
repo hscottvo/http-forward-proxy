@@ -14,7 +14,7 @@ pub struct StartLine {
     version: HttpVersion,
 }
 impl StartLine {
-    const fn new(method: Method, target: Target, version: HttpVersion) -> Self {
+    pub const fn new(method: Method, target: Target, version: HttpVersion) -> Self {
         Self {
             method,
             target,

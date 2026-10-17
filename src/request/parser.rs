@@ -183,7 +183,12 @@ fn contains_body(headers: &HashMap<String, String>) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
+    use std::{collections::HashMap, hash_map};
+
+    use crate::{
+        request::{method::Method, target::Target},
+        types::HttpVersion,
+    };
 
     use super::*;
 
@@ -247,6 +252,35 @@ mod tests {
         parser.push(b"HOST: example.com\r\n")?;
         let expected_headers = HashMap::from([("HOST".to_owned(), "example.com".to_owned())]);
         assert_eq!(parser.headers, expected_headers);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_multiple_bodies() -> Result<()> {
+        let mut parser = RequestParser::new();
+        let startline_a = StartLine::new(
+            Method::Get,
+            Target::Absolute("http://httpbin.org/get?request=one".to_owned()),
+            HttpVersion::Http1_1,
+        );
+
+        let headers_a = hash_map! {
+            "Host".to_owned() => "httpbin.org".to_owned(),
+                "Content-Length".to_owned() => "5".to_owned()
+        };
+        let mut body_a = Body::new(5);
+        body_a.push("hello")?;
+
+        let request_a = Request {
+            startline: startline_a,
+            headers: headers_a,
+            body: Some(body_a),
+        };
+
+        let requests = parser.push(b"GET http://httpbin.org/get?request=one HTTP/1.1\r\nHost: httpbin.org\r\nContent-Length: 5\r\n\r\nhelloGET http://httpbin.org/get?request=two HTTP/1.1\r\nHost: httpbin.org\r\n\r\n")?;
+
+        assert_eq!(*requests.first().unwrap(), request_a);
 
         Ok(())
     }
