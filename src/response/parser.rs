@@ -39,9 +39,9 @@ impl ResponseParser {
             self.buf.push_back(byte);
         }
         let mut ret = Vec::new();
-        while let Some(request) = self.parse()? {
-            trace!(request = %request, buffer_length = self.buf_len());
-            ret.push(request);
+        while let Some(response) = self.parse()? {
+            trace!(response = %response, buffer_length = self.buf_len());
+            ret.push(response);
         }
         Ok(ret)
     }
@@ -182,4 +182,39 @@ impl ResponseParser {
 
 const fn contains_body() -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{response::status_code::StatusCode, types::HttpVersion};
+
+    use super::*;
+    #[test]
+    fn happy_path() -> Result<()> {
+        let mut parser = ResponseParser::new();
+        let response_string = r#"HTTP/1.1 201 Created
+Content-Type: application/json
+Location: http://example.com/users/123
+
+{
+  "message": "New user created",
+  "user": {
+    "id": 123,
+    "firstName": "Example",
+    "lastName": "Person",
+    "email": "bsmth@example.com"
+  }
+}"#;
+        let version = HttpVersion::Http1_1;
+        let status = StatusCode::Created;
+        let reason_phrase = "Created";
+        let status_line = StatusLine::new(version, status, reason_phrase.to_owned());
+
+        let binding = parser.push(response_string.as_bytes())?;
+        let response = binding.first().unwrap();
+
+        assert_eq!(response.status_line, status_line);
+
+        Ok(())
+    }
 }

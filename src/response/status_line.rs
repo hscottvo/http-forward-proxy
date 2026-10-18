@@ -15,7 +15,7 @@ pub struct StatusLine {
 }
 
 impl StatusLine {
-    const fn new(version: HttpVersion, status: StatusCode, reason_phrase: String) -> Self {
+    pub const fn new(version: HttpVersion, status: StatusCode, reason_phrase: String) -> Self {
         Self {
             version,
             status,
